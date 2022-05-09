@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+java -cp target/libs/*:target/classes/ com.guxingke.redis.Server
