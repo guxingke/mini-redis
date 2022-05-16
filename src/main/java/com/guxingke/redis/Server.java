@@ -61,5 +61,8 @@ public class Server {
   private static void initServerConfig() {
     server.port = 6379;
     server.bindaddr = "127.0.0.1";
+
+    // 开启 AOF
+    server.appendonly = true;
   }
 }

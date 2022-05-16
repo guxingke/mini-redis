@@ -97,9 +97,24 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
       return true;
     }
 
-    cmd.proc().apply(c);
+    call(c, cmd);
 
     return true;
+  }
+
+  private void call(
+      RedisClient c,
+      RedisCommand cmd
+  ) {
+    var dirty = RedisServer.dirty;
+    cmd.proc().apply(c);
+    var changes = dirty != RedisServer.dirty;
+
+    if (RedisServer.appendonly && changes) { // dirty changed
+      Aof.feedAppendOnlyFile(cmd, 0, c.argv, c.argv.length);
+    }
+
+    RedisServer.stat_numcommands++;
   }
 
   private boolean processInlineBuffer(RedisClient c) {
