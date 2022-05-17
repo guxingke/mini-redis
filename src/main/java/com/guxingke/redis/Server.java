@@ -2,6 +2,8 @@ package com.guxingke.redis;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -11,6 +13,10 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.util.concurrent.TimeUnit;
 
 public class Server {
 
@@ -26,6 +32,10 @@ public class Server {
   private static void initServer() throws Exception {
     RedisServer.db = new RedisDb(new Dict());
 
+    if (RedisServer.appendonly) {
+      Aof.loadAppendOnlyFile();
+    }
+
     // ----
     var rds = new RedisHandler();
     var elg = new NioEventLoopGroup(1);
@@ -36,12 +46,12 @@ public class Server {
             @Override
             protected void initChannel(ServerSocketChannel sch) throws Exception {
               sch.pipeline().addLast(new LoggingHandler(LogLevel.DEBUG));
-//              sch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-//                @Override
-//                public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-//                  ctx.channel().eventLoop().scheduleAtFixedRate(stats::printStats, 1, 10, TimeUnit.SECONDS);
-//                }
-//              });
+              sch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+                  ctx.channel().eventLoop().scheduleAtFixedRate(Aof::flush, 1, 1, TimeUnit.SECONDS);
+                }
+              });
             }
           }).childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
@@ -58,11 +68,14 @@ public class Server {
     }
   }
 
-  private static void initServerConfig() {
+  private static void initServerConfig() throws FileNotFoundException {
     server.port = 6379;
     server.bindaddr = "127.0.0.1";
 
     // 开启 AOF
     server.appendonly = true;
+    server.aofbuf = new byte[0];
+    server.aof = new File("appendonly.aof");
+    server.aofout = new FileOutputStream(server.aof, true);
   }
 }

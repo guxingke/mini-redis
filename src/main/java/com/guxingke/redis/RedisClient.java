@@ -14,18 +14,23 @@ public class RedisClient {
   public byte[] querybuf;
   public byte[][] argv;
 
+  public int multibulklen;
+  public int bulklen;
+
   public RedisClient(Channel channel) {
     this.channel = channel;
     this.dict = RedisServer.db.dict;
+    this.querybuf = new byte[0];
     reset();
     // final
     this.channel.bindClient(this);
   }
 
   public void reset() {
-    this.querybuf = new byte[0];
     this.argv = new byte[0][0];
     this.reqType = 0;
+    this.multibulklen = 0;
+    this.bulklen = -1;
   }
 
   public void sendError(String msg) {

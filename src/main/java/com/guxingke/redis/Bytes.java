@@ -95,4 +95,14 @@ public abstract class Bytes {
     System.arraycopy(buf, begin, t, 0, t.length);
     return t;
   }
+
+  // parse char array to int
+  public static int parseInt(byte[] bytes) {
+    int len = 0;
+    for (byte b : bytes) {
+      var t = b - 48; // 48 -> 0
+      len = len * 10 + t;
+    }
+    return len;
+  }
 }

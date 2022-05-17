@@ -41,7 +41,7 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
     processInputBuffer(cli);
   }
 
-  private void processInputBuffer(RedisClient c) {
+  public static void processInputBuffer(RedisClient c) {
     while (c.querybuf.length > 0) { // has data
 
       // detect req type
@@ -82,12 +82,13 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
     super.userEventTriggered(ctx, evt);
   }
 
-  private boolean processCommand(RedisClient c) {
+  private static boolean processCommand(RedisClient c) {
     // lookup cmd
     RedisCommand cmd = null;
     for (RedisCommand command : RedisServer.commands) {
       if (Arrays.equals(command.name().getBytes(), c.argv[0])) {
         cmd = command;
+        break;
       }
     }
     if (cmd == null) {
@@ -102,7 +103,7 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
     return true;
   }
 
-  private void call(
+  private static void call(
       RedisClient c,
       RedisCommand cmd
   ) {
@@ -117,7 +118,7 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
     RedisServer.stat_numcommands++;
   }
 
-  private boolean processInlineBuffer(RedisClient c) {
+  private static boolean processInlineBuffer(RedisClient c) {
     int pos = Bytes.newline(c.querybuf);
     if (pos <= 0) {
       return false;
@@ -129,8 +130,64 @@ public class RedisHandler extends ChannelInboundHandlerAdapter {
     return true;
   }
 
-  private boolean processMultiBulkBuffer(RedisClient c) {
-    return true;
+  // *3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar\r\n*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
+  private static boolean processMultiBulkBuffer(RedisClient c) {
+    if (c.multibulklen == 0) {
+      int pos = Bytes.newline(c.querybuf);
+      if (pos <= 0) {
+        return false;
+      }
+      // skip *
+      var len = Bytes.parseInt(Bytes.range(c.querybuf, 1, pos));
+      if (len <= 0) {
+        c.querybuf = Bytes.range(c.querybuf, pos + 2, -1);
+        return true;
+      }
+      if (len > 1024 * 1024) { // 1M
+        c.sendError("Protocol error: invalid multibulk length");
+        return false;
+      }
+
+      c.querybuf = Bytes.range(c.querybuf, pos + 2, -1);
+      c.argv = new byte[len][];
+      c.multibulklen = len;
+    }
+
+    while (c.multibulklen > 0) {
+      /* Read bulk length if unknown */
+      if (c.bulklen == -1) {
+        int pos = Bytes.newline(c.querybuf);
+        if (pos <= 0) {
+          /* No newline in current buffer, so wait for more data */
+          break;
+        }
+        // check $
+        if (c.querybuf[0] != (byte) '$') {
+          c.sendError("Protocol error: expected '$', got '%c'".formatted(c.querybuf[pos]));
+          return false;
+        }
+
+        var len = Bytes.parseInt(Bytes.range(c.querybuf, 1, pos));
+        c.bulklen = len;
+        c.querybuf = Bytes.range(c.querybuf, pos + 2, -1);
+      }
+
+      /* Read bulk argument */
+      if (c.querybuf.length >= c.bulklen + 2) {
+        c.argv[c.argv.length - c.multibulklen] = Bytes.range(c.querybuf, 0, c.bulklen);
+        c.querybuf = Bytes.range(c.querybuf, c.bulklen + 2, -1);
+        c.bulklen = -1;
+        c.multibulklen--;
+      } else {
+        break;
+      }
+    }
+    /* We're done when c->multibulk == 0 */
+    if (c.multibulklen == 0) {
+      return true;
+    }
+
+    return false;
   }
 
   @Override

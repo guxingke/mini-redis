@@ -2,6 +2,9 @@ package com.guxingke.redis;
 
 import static com.guxingke.redis.RedisCommand.of;
 
+import java.io.File;
+import java.io.FileOutputStream;
+
 public abstract class RedisServer {
 
   public static RedisDb db;
@@ -23,5 +26,7 @@ public abstract class RedisServer {
 
   // aof
   public static boolean appendonly;
-  public static byte[] aofbuf = new byte[0];
+  public static byte[] aofbuf;
+  public static File aof;
+  public static FileOutputStream aofout;
 }
