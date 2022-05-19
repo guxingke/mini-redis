@@ -15,7 +15,6 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.util.concurrent.TimeUnit;
 
 public class Server {
@@ -32,8 +31,10 @@ public class Server {
   private static void initServer() throws Exception {
     RedisServer.db = new RedisDb(new Dict());
 
-    if (RedisServer.appendonly) {
+    if (RedisServer.appendonly && RedisServer.aof.exists()) {
       Aof.loadAppendOnlyFile();
+    } else if (RedisServer.rdb) {
+      Rdb.loadRdb(RedisServer.db.dict);
     }
 
     // ----
@@ -76,6 +77,8 @@ public class Server {
     server.appendonly = true;
     server.aofbuf = new byte[0];
     server.aof = new File("appendonly.aof");
-    server.aofout = new FileOutputStream(server.aof, true);
+
+    // rdb
+    server.rdb = true;
   }
 }

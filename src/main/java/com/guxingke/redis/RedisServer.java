@@ -19,6 +19,7 @@ public abstract class RedisServer {
       of("get", TypeString.getCommand(), 2, 0),
       of("set", TypeString.setCommand(), 3, 0),
       of("del", TypeString.delCommand(), 2, 0),
+      of("save", TypeCommon.saveCommand(), 1, 0),
   };
 
   public static int version = 0;
@@ -29,4 +30,7 @@ public abstract class RedisServer {
   public static byte[] aofbuf;
   public static File aof;
   public static FileOutputStream aofout;
+
+  // rdb
+  public static boolean rdb;
 }

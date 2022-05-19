@@ -2,6 +2,7 @@ package com.guxingke.redis;
 
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -85,6 +86,14 @@ public interface Aof {
       byte[][] argv,
       int argc
   ) {
+    if (RedisServer.aofout == null) {
+      try {
+        RedisServer.aofout = new FileOutputStream(RedisServer.aof, true);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      return;
+    }
     byte[] buf = new byte[0];
     buf = Aof.catAppendOnlyGenericCommand(buf, argc, argv);
     RedisServer.aofbuf = Bytes.cat(RedisServer.aofbuf, buf);
